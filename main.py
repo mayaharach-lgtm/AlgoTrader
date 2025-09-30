@@ -8,5 +8,8 @@ with open("data/prices.csv", "r") as f:
     for row in reader:
         prices.append(float(row["price"]))
 
-# Run the threshold strategy with 10% threshold
-threshold_strategy(prices, threshold=0.1)
+# Run the threshold strategy
+final_value, final_holdings = threshold_strategy(prices, threshold=0.1)
+
+print(f"Final Portfolio Value: {final_value}")
+print(f"Final Holdings (stocks owned): {final_holdings}")
