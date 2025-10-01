@@ -1,80 +1,61 @@
-import time
-import matplotlib.pyplot as plt
-from strategy import threshold_strategy, moving_average_strategy, merge_intervals
-from load_stock_data import load_data, get_close_prices
+import yfinance as yf
+from strategy import threshold_strategy, moving_average_strategy
+from load_stock_data import load_data, get_close_prices, TOP_10_TICKERS
+from portfolio import Portfolio
+from colorama import Fore, Style, init
 
-TICKERS = ["AAPL", "MSFT", "NVDA", "AMZN", "TSLA"]
-
-def run_with_yahoo(strategy_choice: str, period: str = "6mo"):
-    results = {}
-    all_prices = {}
-
-    for ticker in TICKERS:
-        print(f"\n=== Running strategy for {ticker} ===")
-        data = load_data(ticker, period=period)
-
-        if data is None or data.empty:
-            print(f"No data for {ticker}, skipping...")
-            continue
-
-        # Robust close extraction (Series or MultiIndex → list[float])
-        prices = get_close_prices(data, ticker=ticker)
-
-        # Run chosen strategy
-        if strategy_choice == "1":
-            final_value, final_holdings, actions = threshold_strategy(prices, threshold=0.1)
-        else:
-            # Make sure your strategy signature matches this call
-            final_value, final_holdings, actions = moving_average_strategy(
-                prices, short_window=10, long_window=30
-            )
-
-        actions = merge_intervals(actions)  # merge consecutive HOLDs
-        results[ticker] = final_value
-        all_prices[ticker] = (prices, actions)
-
-    print("\n===== Final Results =====")
-    for t, v in results.items():
-        print(f"{t}: {v}")
-
-    if results:
-        best_ticker = max(results, key=results.get)
-        print(f"\n🏆 Best performer: {best_ticker} with final value {results[best_ticker]}")
-
-        prices, actions = all_prices[best_ticker]
-
-        # Plot chart for best performer
-        plt.figure(figsize=(10, 5))
-        plt.plot(prices, label=f"{best_ticker} Price")
-
-        buy_x = [i for action, i, price in actions if action == "BUY"]
-        buy_y = [price for action, i, price in actions if action == "BUY"]
-        sell_x = [i for action, i, price in actions if action == "SELL"]
-        sell_y = [price for action, i, price in actions if action == "SELL"]
-
-        plt.scatter(buy_x, buy_y, marker="^", label="BUY", s=100)
-        plt.scatter(sell_x, sell_y, marker="v", label="SELL", s=100)
-
-        plt.title(f"Best Performer: {best_ticker}")
-        plt.xlabel("Days")
-        plt.ylabel("Price ($)")
-        plt.legend()
-        plt.grid(True)
-        plt.show()
-
+# Initialize colorama
+init(autoreset=True)
 
 if __name__ == "__main__":
-    print("Choose strategy:")
+    cash = 1000
+    portfolio = Portfolio(cash=cash)
+
+    print("Choose tickers option:")
+    print("1. Enter manually")
+    print("2. Use TOP 10 tickers")
+    choice = input("Enter 1 or 2: ").strip()
+
+    if choice == "1":
+        tickers_input = input("Enter ticker symbols separated by commas (e.g., AAPL, MSFT, TSLA): ")
+        tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
+    else:
+        tickers = TOP_10_TICKERS
+
+    for t in tickers:
+        portfolio.add_ticker(t)
+
+    print(f"\nPortfolio created with {portfolio.tickers} and starting cash = {portfolio.cash}")
+
+    print("\nChoose strategy:")
     print("1. Threshold Strategy")
     print("2. Moving Average Strategy")
     strategy_choice = input("Enter 1 or 2: ").strip()
 
-    period_choice = input("Enter period (e.g., 1mo, 3mo, 6mo, 1y): ").strip() or "6mo"
+    for ticker in portfolio.tickers:
+        print(f"\n=== Running strategy for {ticker} ===")
+        data = load_data(ticker, period="6mo")
+        prices = get_close_prices(data, ticker)
 
-    # Real-time loop
-    interval = int(input("Enter refresh interval in seconds (e.g., 60): ").strip() or "60")
+        if not prices:
+            print(f"No data for {ticker}, skipping...")
+            continue
 
-    while True:
-        run_with_yahoo(strategy_choice, period=period_choice)
-        print(f"\n⏳ Waiting {interval} seconds before next run...\n")
-        time.sleep(interval)
+        if strategy_choice == "1":
+            final_value, holdings, actions = threshold_strategy(prices, threshold=0.1)
+        else:
+            final_value, holdings, actions = moving_average_strategy(prices)
+
+        # Print all BUY/SELL actions with colors
+        print("Actions:")
+        for action, i, price in actions:
+            if action == "BUY":
+                print(f"{Fore.GREEN}{action}{Style.RESET_ALL} at {price}")
+            elif action == "SELL":
+                print(f"{Fore.RED}{action}{Style.RESET_ALL} at {price}")
+
+        # Print summary
+        print(f"\nFinal Value for {ticker}: {final_value:.2f}")
+        print(f"Holdings left: {holdings}")
+
+    print("\n=== Analysis Finished ===")

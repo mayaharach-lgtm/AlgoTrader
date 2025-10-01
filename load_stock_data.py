@@ -7,7 +7,7 @@ def load_data(ticker: str, period: str = "6mo"):
     Returns a pandas DataFrame or None if no data.
     """
     try:
-        # auto_adjust=True avoids the FutureWarning and returns adjusted OHLC
+        # auto_adjust=True avoids dividend/split adjustments
         data = yf.download(ticker, period=period, progress=False, auto_adjust=True)
         if data is None or data.empty:
             print(f"⚠️ No data found for {ticker}")
@@ -37,12 +37,10 @@ def get_close_prices(data: pd.DataFrame, ticker: str | None = None) -> list[floa
         close = data["Adj Close"]
     # Case B: MultiIndex columns (e.g., ('Close', 'AAPL'))
     elif isinstance(cols, pd.MultiIndex):
-        # Try ('Close', <ticker>) first
         if ticker is not None:
             try:
                 close = data.loc[:, ("Close", ticker)]
             except Exception:
-                # fallback to first available 'Close' column
                 close = data.loc[:, ("Close", slice(None))].iloc[:, 0]
         else:
             close = data.loc[:, ("Close", slice(None))].iloc[:, 0]
@@ -53,5 +51,19 @@ def get_close_prices(data: pd.DataFrame, ticker: str | None = None) -> list[floa
     if isinstance(close, pd.DataFrame):
         close = close.iloc[:, 0]
 
-    # Ensure float list
-    return close.astype(float).to_list()
+    return close.astype(float).tolist()
+
+
+# Default top 10 tickers if user doesn't provide their own
+TOP_10_TICKERS = [
+    "AAPL",  # Apple
+    "MSFT",  # Microsoft
+    "AMZN",  # Amazon
+    "GOOGL", # Alphabet (Google)
+    "META",  # Meta (Facebook)
+    "TSLA",  # Tesla
+    "NVDA",  # Nvidia
+    "JPM",   # JP Morgan
+    "V",     # Visa
+    "NFLX"   # Netflix
+]
